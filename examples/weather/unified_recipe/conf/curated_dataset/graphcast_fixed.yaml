@@ -1,0 +1,50 @@
+train_dataset_filename: unified_recipe_datasets/graphcast_fixed_train.zarr
+val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val.zarr
+
+dt: 6
+
+train_years: ["2018-01-01", "2018-01-02"]
+val_years: ["2018-01-03", "2018-01-08"]
+
+chunk_channels_together: True
+
+nr_inputs_surface: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.inputs_surface}])'}
+nr_inputs_pressure_levels: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.inputs_pressure_levels}])'}
+nr_forcings: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.forcings}])'}
+nr_constants: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.constants}])'}
+nr_node_features: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.node_features}])'}
+
+variable_groups:
+  constants: # 2
+  - "land_sea_mask" #
+  - "geopotential_at_surface" #
+  inputs_surface: # 5 * 2 = 10
+  - "2m_temperature" #
+  - "10m_u_component_of_wind" #
+  - "10m_v_component_of_wind" #
+  - "mean_sea_level_pressure" # 
+  - "total_precipitation" #
+  inputs_pressure_levels: # (6*13)*2 = 156 or (6*37)*2 = 444
+  - "vertical_velocity" #
+  - "geopotential" #
+  - "temperature" #
+  - "u_component_of_wind" #
+  - "v_component_of_wind" #
+  - "specific_humidity" #
+  # - ["vertical_velocity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["geopotential", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["temperature", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["u_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["v_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["specific_humidity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  forcings: # (3 * 5) = 15
+  - "toa_incident_solar_radiation" #
+  - "day_progress_sin" #
+  - "day_progress_cos" #
+  - "year_progress_sin" #
+  - "year_progress_cos" #
+  node_features: # 3
+  - "cos_latitude" #
+  - "cos_longitude" #
+  - "sin_longitude" #
+  

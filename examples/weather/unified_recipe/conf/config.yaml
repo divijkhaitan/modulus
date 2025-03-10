@@ -26,16 +26,19 @@ defaults:
   #- filesystem/object_storage
 
   # Dataset
-  - dataset/tiny_6hr_subsample
-  #- dataset/6hr_subsample # uncomment for full dataset
-
+  - dataset/6hr_subsample # uncomment for full dataset
+# - dataset/tiny_6hr_subsample
+  
   # Curated Dataset
-  - curated_dataset/tiny_2_var
+  - curated_dataset/graphcast_fixed.yaml
+  #- curated_dataset/graphcast_13.yaml
+  #- curated_dataset/tiny_2_var
   #- curated_dataset/healpix_19_var
   #- curated_dataset/34_var
   
   # Transform
-  - transform/trim_lat720
+  - transform/none
+  #- transform/trim_lat720
   #- transform/healpix
   #- transform/downsample
 
@@ -43,15 +46,15 @@ defaults:
   - datapipe/default
 
   # Model
-  - model/tiny_afno
+  # - model/tiny_afno
   #- model/afno
-  #- model/graphcastnet
+  - model/graphcastnet
   #- model/tiny_sfno
   #- model/sfno
 
   # Training
-  - training/afno
-  #- training/graphcastnet
+  # - training/afno
+  - training/graphcastnet
   #- training/sfno
 
   # Validation

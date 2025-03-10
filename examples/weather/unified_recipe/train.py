@@ -84,15 +84,15 @@ def main(cfg: DictConfig) -> None:
     dist = DistributedManager()
 
     # Initialize loggers
-    initialize_mlflow(
-        experiment_name=cfg.experiment_name,
-        experiment_desc=cfg.experiment_desc,
-        run_name=f"{cfg.model.name}-trainng",
-        run_desc=cfg.experiment_desc,
-        user_name="Modulus User",
-        mode="offline",
-    )
-    LaunchLogger.initialize(use_mlflow=True)  # Modulus launch logger
+    # initialize_mlflow(
+    #     experiment_name=cfg.experiment_name,
+    #     experiment_desc=cfg.experiment_desc,
+    #     run_name=f"{cfg.model.name}-trainng",
+    #     run_desc=cfg.experiment_desc,
+    #     user_name="Modulus User",
+    #     mode="offline",
+    # )
+    LaunchLogger.initialize(use_mlflow=False)  # Modulus launch logger
     logger = PythonLogger("main")  # General python logger
 
     # Initialize model

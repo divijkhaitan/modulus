@@ -1,0 +1,30 @@
+train_dataset_filename: unified_recipe_datasets/graphcast_13var_train.zarr
+val_dataset_filename: unified_recipe_datasets/graphcast_13var_val.zarr
+
+dt: 6
+
+train_years: ["2018-01-01", "2018-01-02"]
+val_years: ["2018-01-03", "2018-01-08"]
+
+chunk_channels_together: True
+
+nr_predicted_variables: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.predicted_variables}])'}
+nr_unpredicted_variables: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.unpredicted_variables}])'}
+
+unpredicted_variables:
+  - "land_sea_mask"
+  - "toa_incident_solar_radiation"
+  - "geopotential_at_surface"
+  
+predicted_variables:
+  - "2m_temperature"
+  - "10m_u_component_of_wind"
+  - "10m_v_component_of_wind"
+  - "mean_sea_level_pressure"
+  - "total_precipitation"
+  - ["vertical_velocity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  - ["geopotential", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  - ["temperature", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  - ["u_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  - ["v_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  - ["specific_humidity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]

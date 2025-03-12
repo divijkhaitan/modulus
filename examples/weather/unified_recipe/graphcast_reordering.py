@@ -357,6 +357,7 @@ reorder_176_to_original_176 = [reordered_indices_176[feature] for feature in ORI
 reorder_178_to_original_176 = [reordered_indices_178[feature] for feature in ORIGINAL_ORDER_INPUTS_176]
 reorder_178_to_original_output = [reordered_indices_178[feature] for feature in ORIGINAL_ORDER_OUTPUTS_83]
 reorder_output_to_original_output = [reordered_indices_outputs_83[feature] for feature in ORIGINAL_ORDER_OUTPUTS_83]
+original_output_to_reorder_output = [original_indices_outputs_83[feature] for feature in reordered_features_list_outputs_83]
 
 original_178_to_original_83 = [original_indices_inputs_178[feature] for feature in ORIGINAL_ORDER_OUTPUTS_83]
 original_176_to_original_83 = [original_indices_inputs_176[feature] if feature in original_indices_inputs_176 else None for feature in ORIGINAL_ORDER_OUTPUTS_83]

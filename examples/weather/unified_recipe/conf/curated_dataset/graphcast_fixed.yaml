@@ -13,6 +13,8 @@ nr_inputs_pressure_levels: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 
 nr_forcings: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.forcings}])'}
 nr_constants: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.constants}])'}
 nr_node_features: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.node_features}])'}
+nr_excluded_inputs: 1
+nr_pressure_levels: 13
 
 variable_groups:
   constants: # 2

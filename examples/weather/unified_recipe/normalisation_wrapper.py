@@ -3,9 +3,28 @@ from typing import Optional, Tuple, Union
 import xarray
 import torch
 import logging
+from modulus.models.module import Module
+from dataclasses import dataclass
+from modulus.models.meta import ModelMetaData
 
+@dataclass
+class MetaData(ModelMetaData):
+    name: str = "Norm_Wrapper_Graphcast"
+    # Optimization
+    jit: bool = False
+    cuda_graphs: bool = False
+    amp_cpu: bool = True
+    amp_gpu: bool = True
+    torch_fx: bool = False
+    # Data type
+    bf16: bool = True
+    # Inference
+    onnx: bool = False
+    # Physics informed
+    func_torch: bool = False
+    auto_grad: bool = False
 
-class InputsAndResiduals(torch.nn.Module):
+class Norm_Wrapper_GraphCast(Module):
     """Wraps a PyTorch model with a residual connection, normalizing inputs and target residuals.
 
     The inner PyTorch model is given inputs that are normalized using `locations`
@@ -186,7 +205,7 @@ class InputsAndResiduals(torch.nn.Module):
         inputs = inputs[..., self.input_permutation, :, :]
         norm_inputs = self._normalize(inputs, self.input_scales, self.input_locations)
         norm_forcings = self._normalize(forcings, self.forcing_scales, self.forcing_locations)
-
+        
         # Concatenate inputs, forcings and node features along the channel dimension.
         combined_inputs = torch.cat((norm_inputs, norm_forcings, node_features), dim=-3).to(self.model.device).unsqueeze(0)
         norm_predictions = self.model(combined_inputs)
@@ -194,7 +213,7 @@ class InputsAndResiduals(torch.nn.Module):
         
         # norm_inputs has shape 176 in original order
         predictions = self._unnormalize_prediction_and_add_input(inputs, norm_predictions)
-
+        
         return predictions
 
     def loss(self, inputs: torch.Tensor, outputs: torch.Tensor, targets: torch.Tensor, criterion: torch.nn.Module, **kwargs) -> torch.Tensor:

@@ -158,6 +158,7 @@ def healpix_transform(dataset, nside=32, order="bilinear"):
 transform_registry = {
     "downsample": downsample_transform,
     "trim_lat720": trim_lat720_transform,
+    'none': lambda x: x,
 }
 
 try:

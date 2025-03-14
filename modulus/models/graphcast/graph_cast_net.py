@@ -17,7 +17,7 @@
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import torch
 from torch import Tensor
@@ -243,6 +243,10 @@ class GraphCastNet(Module):
         multimesh_level: Optional[int] = None,
         multimesh: bool = True,
         input_res: tuple = (721, 1440),
+        lat_max: float = 359.75,
+        lat_min: float = 0.0,
+        lon_max: float = 90,
+        lon_min: float = -90.0,
         input_dim_grid_nodes: int = 474,
         input_dim_mesh_nodes: int = 3,
         input_dim_edges: int = 4,
@@ -268,6 +272,10 @@ class GraphCastNet(Module):
         global_features_on_rank_0: bool = False,
         produce_aggregated_output: bool = True,
         produce_aggregated_output_on_all_ranks: bool = True,
+        checkpoint_model: bool = True,
+        checkpoint_encoder: bool = True,
+        checkpoint_decoder: bool = True
+
     ):
         super().__init__(meta=MetaData())
 
@@ -293,10 +301,12 @@ class GraphCastNet(Module):
             produce_aggregated_output_on_all_ranks
         )
         self.partition_group_name = partition_group_name
-
+        self.checkpoint_model = checkpoint_model
+        self.checkpoint_encoder = checkpoint_encoder
+        self.checkpoint_decoder = checkpoint_decoder
         # create the lat_lon_grid
-        self.latitudes = torch.linspace(-90, 90, steps=input_res[0])
-        self.longitudes = torch.linspace(-180, 180, steps=input_res[1] + 1)[1:]
+        self.latitudes = torch.linspace(lat_min, lat_max, steps=input_res[0])
+        self.longitudes = torch.linspace(lon_min, lon_max, steps=input_res[1] + 1)[1:]
         self.lat_lon_grid = torch.stack(
             torch.meshgrid(self.latitudes, self.longitudes, indexing="ij"), dim=-1
         )
@@ -403,7 +413,7 @@ class GraphCastNet(Module):
         self.input_res = input_res
 
         # by default: don't checkpoint at all
-        self.model_checkpoint_fn = set_checkpoint_fn(False)
+        self.model_checkpoint_fn = set_checkpoint_fn(self.checkpoint_model)
         self.encoder_checkpoint_fn = set_checkpoint_fn(False)
         self.decoder_checkpoint_fn = set_checkpoint_fn(False)
 

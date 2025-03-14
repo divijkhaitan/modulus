@@ -39,3 +39,6 @@ args:
   use_cugraphops_processor: False
   use_cugraphops_decoder: False
   recompute_activation: False
+  checkpoint_model: True
+  checkpoint_encoder : True
+  checkpoint_decoder: True

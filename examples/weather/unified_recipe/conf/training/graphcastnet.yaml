@@ -14,11 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-amp_supported: !!bool False
+amp_supported: !!bool True
 batch_size: 1
 
 optimizer:
-  framework: apex
   name: Adam
   args:
     betas: [0.9, 0.999]

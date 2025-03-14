@@ -83,9 +83,10 @@ class Norm_Wrapper_GraphCast(Module):
         output_variables: list[str],
         input_permutation: list[int],
         outputs_from_inputs: list[Union[Optional[int]]],
-        outputs_from_full_inputs: list[Union[Optional[int]]]
+        outputs_from_full_inputs: list[Union[Optional[int]]],
+        output_permutation: list[Union[Optional[int]]]
     ):
-        super().__init__()
+        super().__init__(meta=(MetaData)())
         self.model = model
         self.input_variables = input_variables
         self.output_variables = output_variables
@@ -99,6 +100,7 @@ class Norm_Wrapper_GraphCast(Module):
         self.input_permutation = input_permutation
         self.outputs_from_input_order = outputs_from_inputs
         self.outputs_from_full_input_order = outputs_from_full_inputs
+        self.output_permutation = output_permutation
 
         self.input_scales = self._get_tensor_from_dataset(self.input_variables, [], stddev_by_level).view(len(self.input_variables), 1, 1)
         self.input_locations = self._get_tensor_from_dataset(self.input_variables, [], mean_by_level).view(len(self.input_variables), 1, 1)
@@ -240,8 +242,8 @@ class Norm_Wrapper_GraphCast(Module):
         # combined_inputs = torch.cat((inputs[..., self.input_permutation, :, :], forcings, node_features), dim=-3).to(self.model.device).unsqueeze(0)
         # combined_inputs_extracted_outputs = self._outputs_from_input_tensor(combined_inputs)
         
-        # Targets has size 178, extracted_outputs should have size 83
-        targets_extracted_outputs = self._outputs_from_input_tensor(targets, self.outputs_from_full_input_order)
+        # Targets has size 83, extracted_outputs should have size 83
+        targets_extracted_outputs = targets[..., self.output_permutation, :, :]
         
         inputs = inputs[..., self.input_permutation, :, :] # Inputs now has size 176 and is in original order
         

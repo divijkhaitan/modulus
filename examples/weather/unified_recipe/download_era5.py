@@ -23,7 +23,8 @@ import xarray as xr
 from dask.diagnostics import ProgressBar
 from omegaconf import DictConfig, OmegaConf
 import data_utils
-    
+import os
+
 from utils import get_filesystem
 
 # Add eval to OmegaConf TODO: Remove when OmegaConf is updated
@@ -56,9 +57,14 @@ def main(cfg: DictConfig) -> None:
     arco_filename = (
         "gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3"
     )
-    gs_fs = fsspec.filesystem("gs")
-    arco_era5 = xr.open_zarr(gs_fs.get_mapper(arco_filename), consolidated=True)
-
+    # gs_fs = fsspec.filesystem("gs")
+    # arco_era5 = xr.open_zarr(gs_fs.get_mapper(arco_filename), consolidated=True)
+    os.environ['NO_GCE_CHECK'] = 'true'
+    arco_era5 = xr.open_zarr(
+        arco_filename, 
+        storage_options={'anon': True, 'token': 'anon'}, 
+        consolidated=True
+    )
     # Drop variables that are not needed
     for variable in arco_era5.variables:
         if (

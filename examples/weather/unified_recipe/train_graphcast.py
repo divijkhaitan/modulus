@@ -104,7 +104,7 @@ def main(cfg: DictConfig) -> None:
         print(f"Loaded Model from {cfg.model.pretrain_load_path}")
     except Exception as e:
         print(e)
-    model = model.to('cpu')
+    model = model.to(dist.device)
     # Distributed learning
     if dist.world_size > 1:
         ddps = torch.cuda.Stream()
@@ -112,7 +112,7 @@ def main(cfg: DictConfig) -> None:
             model = DistributedDataParallel(
                 model,
                 device_ids=[dist.local_rank],
-                output_device='cpu',
+                output_device=dist.device,
                 broadcast_buffers=dist.broadcast_buffers,
                 find_unused_parameters=dist.find_unused_parameters,
             )
@@ -130,7 +130,7 @@ def main(cfg: DictConfig) -> None:
         models=model,
         optimizer=optimizer,
         scheduler=None,
-        device='cpu',
+        device=dist.device,
     )
 
     # Initialize filesytem (TODO: Add multiple filesystem support)
@@ -152,7 +152,7 @@ def main(cfg: DictConfig) -> None:
         batch_size=cfg.validation.batch_size,
         num_steps=cfg.validation.num_steps + cfg.model.nr_input_steps,
         shuffle=False,
-        device='cpu',
+        device=dist.device,
         process_rank=dist.rank,
         world_size=dist.world_size,
         batch=cfg.datapipe.batch,
@@ -284,7 +284,7 @@ def main(cfg: DictConfig) -> None:
             batch_size=stage.batch_size,
             num_steps=stage.unroll_steps + cfg.model.nr_input_steps,
             shuffle=True,
-            device='cpu',
+            device=dist.device,
             process_rank=dist.rank,
             world_size=dist.world_size,
             batch=cfg.datapipe.batch,

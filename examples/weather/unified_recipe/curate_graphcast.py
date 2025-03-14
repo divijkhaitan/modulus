@@ -248,7 +248,7 @@ def main(cfg: DictConfig) -> None:
         date_range=cfg.curated_dataset.train_years,
         dt=cfg.curated_dataset.dt,
         chunk_channels_together=cfg.curated_dataset.chunk_channels_together,
-        resolution=cfg.resolution
+        resolution=cfg.curated_dataset.resolution
     )
     curate_train_era5()
 
@@ -262,7 +262,7 @@ def main(cfg: DictConfig) -> None:
         date_range=cfg.curated_dataset.val_years,
         dt=cfg.curated_dataset.dt,
         chunk_channels_together=cfg.curated_dataset.chunk_channels_together,
-        resolution=cfg.resolution
+        resolution=cfg.curated_dataset.resolution
     )
     curate_val_era5()
 

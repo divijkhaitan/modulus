@@ -199,47 +199,48 @@ def main(cfg: DictConfig) -> None:
                                    ORIGINAL_ORDER_INPUTS_176, ORIGINAL_ORDER_OUTPUTS_83, 
                                    reorder_178_to_original_176, original_176_to_original_83, 
                                    reorder_178_to_original_output, reorder_output_to_original_output)
+    permutation = reorder_output_to_original_output
+    variable_order = ORIGINAL_ORDER_OUTPUTS_83
     # Unroll network
     def unroll(model, constants, inputs, forcings, node_features, num_steps = 1):
         # Get number of steps to unroll
-        if forcings.shape[0] < 3:
+        possible_steps = min(inputs.shape[0], forcings.shape[0])
+        if possible_steps < 3:
             raise ValueError("Need forcings at at least 3 different timesteps to make predictions")
-        max_steps = forcings.shape[0] - 2
+        max_steps = possible_steps - 2
         model_pred_i_minus_1 = inputs[0]
         model_pred_i_0 = inputs[1]
         model_predicted = []
+        model_targets = []
         for i in range(min(num_steps, max_steps)):
             # Create Input
-            print(i)
             input = torch.concat((constants, forcings[i], model_pred_i_minus_1.squeeze(), forcings[i+1], model_pred_i_0.squeeze()), dim=0)
-            print("Concatenated")
-            # Store Predictions and update next steps for rollout
             model_pred_i_minus_1 = model_pred_i_0
-            print("Moved")
-            model_pred_i_0 = model(input, forcings[i+2], node_features)[original_output_to_reorder_output]
-            print("Computed")
+            model_pred_i_0 = model(input, forcings[i+2], node_features)
+            
             model_predicted.append(model_pred_i_0)
-            print("Appended")
-
+            model_pred_i_0 = model_pred_i_0[..., original_output_to_reorder_output, :, :]
+            model_targets.append(inputs[i+2].unsqueeze(0))
         # Stack predictions
         model_predicted = torch.stack(model_predicted, dim=1)
+        model_targets = torch.stack(model_targets, dim=1) # Currently reordered, but that is remedied in the loss_computation
 
-        return model_predicted
+        return model_predicted, model_targets
     # Evaluation forward pass
     @StaticCaptureEvaluateNoGrad(model=model, logger=logger, use_graphs=False)
-    def eval_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
+    def eval_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps, permutation = reorder_output_to_original_output):
         # Forward pass
-        targets = inputs[..., 2:, :, :, :]
         model.eval()
         with torch.no_grad():
-            outputs = unroll(
+            outputs, targets = unroll(
                 model, constants, inputs, forcings, node_features, nr_training_steps
             )
 
             # Get l2 loss
-            model.loss(inputs, outputs, targets, criterion)
-
-        return loss, outputs, targets[..., 2: min(2 + nr_training_steps, inputs.shape[-4] - 1), :, :, :]
+            loss = model.loss(inputs, outputs, targets, criterion)
+        
+        # Targets are re-ordered. To get same order as output, we need to permute to the original order
+        return loss, outputs, targets[:, permutation, :, :]
 
     # Training forward pass
 
@@ -249,16 +250,15 @@ def main(cfg: DictConfig) -> None:
     )  # TODO: remove amp supported config after SFNO fixed
     def train_step_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
         # Forward pass
-        targets = inputs[..., 2:, :, :, :]
         model.train()
-        outputs = unroll(
+        outputs, targets = unroll(
             model, constants, inputs, forcings, node_features, nr_training_steps
         )
 
         # Get l2 loss
-        model.loss(inputs, outputs, targets, criterion)
+        loss = model.loss(inputs, outputs, targets, criterion)
 
-        return loss, outputs, (targets[..., 2:2: min(2 + nr_training_steps, inputs.shape[-4] - 1), :, :, :])[reorder_output_to_original_output]
+        return loss
 
 
     # Main training loop
@@ -327,7 +327,12 @@ def main(cfg: DictConfig) -> None:
                     # Get predicted and unpredicted variables
                     constants = data[0]['constants']
                     inputs_surface = data[0]['inputs_surface']
-                    inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], (cfg.training.batch_size, cfg.model.nr_input_steps + stage.unroll_steps, cfg.curated_dataset.nr_, 721, 1440))
+                    inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], 
+                                                           (cfg.training.batch_size, 
+                                                            cfg.model.nr_input_steps + stage.unroll_steps, 
+                                                            (cfg.curated_dataset.nr_pressure_levels * 
+                                                            cfg.curated_dataset.nr_inputs_pressure_levels), 
+                                                            cfg.model.input_shape[0], cfg.model.input_shape[1]))
                     forcings = data[0]['forcings'].permute((0, 1, 2, 4, 3))
                     node_features = data[0]['node_features']
                     inputs = torch.concat((inputs_surface, inputs_pressure_levels), dim=-3).squeeze()
@@ -396,7 +401,9 @@ def main(cfg: DictConfig) -> None:
                             loss,
                             outputs,
                             targets,
-                        ) = eval_forward(model, constants.squeeze()[0], inputs, forcings.squeeze(), node_features.squeeze()[0], criterion, stage.unroll_steps)
+                        ) = eval_forward(model, constants.squeeze()[0], 
+                                         inputs, forcings.squeeze(), node_features.squeeze()[0], 
+                                         criterion, stage.unroll_steps, permutation=permutation)
                         
                         loss_epoch += loss.detach().cpu().numpy()
                         num_examples += targets.shape[0]
@@ -430,7 +437,7 @@ def main(cfg: DictConfig) -> None:
                                     )
 
                                 fig.savefig(
-                                    f"forecast_validation_var{ORIGINAL_ORDER_OUTPUTS_83[chan]}_epoch{epoch}.png"
+                                    f"forecast_validation_var{variable_order[chan]}_epoch{epoch}.png"
                                 )
 
                     # Log validation loss

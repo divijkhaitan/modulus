@@ -47,7 +47,7 @@ defaults:
 
   # Model
   # - model/tiny_afno
-  #- model/afno
+  # - model/afno
   - model/graphcastnet
   #- model/tiny_sfno
   #- model/sfno

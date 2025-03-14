@@ -25,12 +25,12 @@ from torch.autograd.function import once_differentiable
 
 from .utils import CuGraphCSC, concat_efeat, sum_efeat
 
-try:
-    from transformer_engine import pytorch as te
+# try:
+#     from transformer_engine import pytorch as te
 
-    te_imported = True
-except ImportError:
-    te_imported = False
+#     te_imported = True
+# except ImportError:
+te_imported = False
 
 
 class CustomSiLuLinearAutogradFunction(torch.autograd.Function):

@@ -198,7 +198,7 @@ def main(cfg: DictConfig) -> None:
     model = Norm_Wrapper_GraphCast(model, input_std, input_mean, output_std, 
                                    ORIGINAL_ORDER_INPUTS_176, ORIGINAL_ORDER_OUTPUTS_83, 
                                    reorder_178_to_original_176, original_176_to_original_83, 
-                                   reorder_178_to_original_output)
+                                   reorder_178_to_original_output, reorder_output_to_original_output)
     # Unroll network
     def unroll(model, constants, inputs, forcings, node_features, num_steps = 1):
         # Get number of steps to unroll
@@ -226,7 +226,7 @@ def main(cfg: DictConfig) -> None:
 
         return model_predicted
     # Evaluation forward pass
-    # @StaticCaptureEvaluateNoGrad(model=model, logger=logger, use_graphs=False)
+    @StaticCaptureEvaluateNoGrad(model=model, logger=logger, use_graphs=False)
     def eval_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
         # Forward pass
         targets = inputs[..., 2:, :, :, :]
@@ -244,9 +244,9 @@ def main(cfg: DictConfig) -> None:
     # Training forward pass
 
 
-    # @StaticCaptureTraining(
-    #     model=model, optim=optimizer, logger=logger, use_amp=cfg.training.amp_supported
-    # )  # TODO: remove amp supported config after SFNO fixed
+    @StaticCaptureTraining(
+        model=model, optim=optimizer, logger=logger, use_amp=cfg.training.amp_supported
+    )  # TODO: remove amp supported config after SFNO fixed
     def train_step_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
         # Forward pass
         targets = inputs[..., 2:, :, :, :]
@@ -327,7 +327,7 @@ def main(cfg: DictConfig) -> None:
                     # Get predicted and unpredicted variables
                     constants = data[0]['constants']
                     inputs_surface = data[0]['inputs_surface']
-                    inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], (cfg.training.batch_size, cfg.model.nr_input_steps + stage.unroll_steps, 78, 721, 1440))
+                    inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], (cfg.training.batch_size, cfg.model.nr_input_steps + stage.unroll_steps, cfg.curated_dataset.nr_, 721, 1440))
                     forcings = data[0]['forcings'].permute((0, 1, 2, 4, 3))
                     node_features = data[0]['node_features']
                     inputs = torch.concat((inputs_surface, inputs_pressure_levels), dim=-3).squeeze()
@@ -371,7 +371,12 @@ def main(cfg: DictConfig) -> None:
                     for i, data in enumerate(val_datapipe):
                         constants = data[0]['constants']
                         inputs_surface = data[0]['inputs_surface']
-                        inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], (cfg.validation.batch_size, cfg.model.nr_input_steps + stage.unroll_steps, 78, 721, 1440))
+                        inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], 
+                                                               (cfg.validation.batch_size, cfg.model.nr_input_steps + 
+                                                                stage.unroll_steps, 
+                                                                (cfg.curated_dataset.nr_pressure_levels 
+                                                                * cfg.curated_dataset.nr_inpurs_pressure_levels), 
+                                                                cfg.model.input_shape[0], cfg.model.input_shape[1]))
                         forcings = data[0]['forcings'].permute((0, 1, 2, 4, 3))
                         node_features = data[0]['node_features']
                         inputs = torch.concat((inputs_surface, inputs_pressure_levels), dim=-3).squeeze()

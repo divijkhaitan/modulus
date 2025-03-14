@@ -243,10 +243,10 @@ class GraphCastNet(Module):
         multimesh_level: Optional[int] = None,
         multimesh: bool = True,
         input_res: tuple = (721, 1440),
-        lat_max: float = 359.75,
-        lat_min: float = 0.0,
-        lon_max: float = 90,
-        lon_min: float = -90.0,
+        lon_max: float = 360.0,
+        lon_min: float = 0.0,
+        lat_max: float = 90,
+        lat_min: float = -90.0,
         input_dim_grid_nodes: int = 474,
         input_dim_mesh_nodes: int = 3,
         input_dim_edges: int = 4,
@@ -305,8 +305,8 @@ class GraphCastNet(Module):
         self.checkpoint_encoder = checkpoint_encoder
         self.checkpoint_decoder = checkpoint_decoder
         # create the lat_lon_grid
-        self.latitudes = torch.linspace(lat_min, lat_max, steps=input_res[0])
-        self.longitudes = torch.linspace(lon_min, lon_max, steps=input_res[1] + 1)[1:]
+        self.latitudes = torch.linspace(lat_min, lat_max, input_res[0])
+        self.longitudes = torch.linspace(lon_min -180, lon_max - 180, steps=input_res[1] + 1)[:-1]
         self.lat_lon_grid = torch.stack(
             torch.meshgrid(self.latitudes, self.longitudes, indexing="ij"), dim=-1
         )

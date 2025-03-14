@@ -99,7 +99,7 @@ class Norm_Wrapper_GraphCast(Module):
 
         self.input_permutation = input_permutation
         self.outputs_from_input_order = outputs_from_inputs
-        self.outputs_from_full_input_order = outputs_from_full_inputs
+        # self.outputs_from_full_input_order = outputs_from_full_inputs
         self.output_permutation = output_permutation
 
         self.input_scales = self._get_tensor_from_dataset(self.input_variables, [], stddev_by_level).view(len(self.input_variables), 1, 1)
@@ -193,11 +193,7 @@ class Norm_Wrapper_GraphCast(Module):
                                              target: torch.Tensor
                                              ) -> torch.Tensor:
         """Subtracts input from target (for residuals) and normalizes."""
-        # get correct output order, replacing invalid inputs with global mean
-        # inputs is expected to have original order
-        last_input = self._outputs_from_input_tensor(inputs, self.outputs_from_input_order)
-        
-        target_residual = self._normalize(target, self.output_scales, last_input)
+        target_residual = self._normalize(target, self.output_scales, inputs)
         return target_residual
 
     def forward(self, inputs: torch.Tensor, forcings: torch.Tensor, node_features: torch.Tensor) -> torch.Tensor:
@@ -242,12 +238,13 @@ class Norm_Wrapper_GraphCast(Module):
         # combined_inputs = torch.cat((inputs[..., self.input_permutation, :, :], forcings, node_features), dim=-3).to(self.model.device).unsqueeze(0)
         # combined_inputs_extracted_outputs = self._outputs_from_input_tensor(combined_inputs)
         
-        # Targets has size 83, extracted_outputs should have size 83
-        targets_extracted_outputs = targets[..., self.output_permutation, :, :]
+        # targets is a single weather state, extracted_outputs should have size 83
+        targets = targets[..., self.output_permutation, :, :]
         
-        inputs = inputs[..., self.input_permutation, :, :] # Inputs now has size 176 and is in original order
+        # Inputs are the targets shifted backwards, so the same applies to them
+        inputs = inputs[..., self.output_permutation, :, :]
         
-        norm_actual_residuals = self._subtract_input_and_normalize_target(inputs, targets_extracted_outputs)
+        norm_actual_residuals = self._subtract_input_and_normalize_target(inputs, targets)
         norm_predicted_residuals = self._subtract_input_and_normalize_target(inputs, outputs)
                 
         loss = criterion(norm_predicted_residuals, norm_actual_residuals, **kwargs)

@@ -30,7 +30,8 @@ defaults:
 # - dataset/tiny_6hr_subsample
   
   # Curated Dataset
-  - curated_dataset/graphcast_fixed.yaml
+  - curated_dataset/graphcast_fixed_base.yaml
+  # - curated_dataset/graphcast_fixed.yaml
   #- curated_dataset/graphcast_13.yaml
   #- curated_dataset/tiny_2_var
   #- curated_dataset/healpix_19_var
@@ -48,7 +49,8 @@ defaults:
   # Model
   # - model/tiny_afno
   # - model/afno
-  - model/graphcastnet
+  - model/basegraphcastnet
+  # - model/graphcastnet
   #- model/tiny_sfno
   #- model/sfno
 

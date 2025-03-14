@@ -104,7 +104,9 @@ def main(cfg: DictConfig) -> None:
         print(f"Loaded Model from {cfg.model.pretrain_load_path}")
     except Exception as e:
         print(e)
-    model = model.to(dist.device)
+    # device = dist.device
+    device = 'cpu'
+    model = model.to(device)
     # Distributed learning
     if dist.world_size > 1:
         ddps = torch.cuda.Stream()
@@ -112,7 +114,7 @@ def main(cfg: DictConfig) -> None:
             model = DistributedDataParallel(
                 model,
                 device_ids=[dist.local_rank],
-                output_device=dist.device,
+                output_device=device,
                 broadcast_buffers=dist.broadcast_buffers,
                 find_unused_parameters=dist.find_unused_parameters,
             )
@@ -130,7 +132,7 @@ def main(cfg: DictConfig) -> None:
         models=model,
         optimizer=optimizer,
         scheduler=None,
-        device=dist.device,
+        device=device,
     )
 
     # Initialize filesytem (TODO: Add multiple filesystem support)
@@ -152,7 +154,7 @@ def main(cfg: DictConfig) -> None:
         batch_size=cfg.validation.batch_size,
         num_steps=cfg.validation.num_steps + cfg.model.nr_input_steps,
         shuffle=False,
-        device=dist.device,
+        device=device,
         process_rank=dist.rank,
         world_size=dist.world_size,
         batch=cfg.datapipe.batch,
@@ -194,10 +196,11 @@ def main(cfg: DictConfig) -> None:
     latitude = xr.open_zarr(cfg.curated_dataset.train_dataset_filename).coords['latitude'].values
 
     loss_weights = get_weights((cfg.model.nr_output_channels, cfg.model.input_shape[0], cfg.model.input_shape[1]), latitude, levels_by_order, per_variable_weight_mapping)
+    loss_weights = loss_weights.to(device)
     criterion = WeightedMSELoss(loss_weights)
     model = Norm_Wrapper_GraphCast(model, input_std, input_mean, output_std, 
-                                   ORIGINAL_ORDER_INPUTS_176, ORIGINAL_ORDER_OUTPUTS_83, 
-                                   reorder_178_to_original_176, original_176_to_original_83, 
+                                   ORIGINAL_ORDER_INPUTS_178, ORIGINAL_ORDER_OUTPUTS_83, 
+                                   reorder_178_to_original_178, original_178_to_original_83, 
                                    reorder_178_to_original_output, reorder_output_to_original_output)
     permutation = reorder_output_to_original_output
     variable_order = ORIGINAL_ORDER_OUTPUTS_83
@@ -212,35 +215,39 @@ def main(cfg: DictConfig) -> None:
         model_pred_i_0 = inputs[1]
         model_predicted = []
         model_targets = []
+        model_inputs = []
         for i in range(min(num_steps, max_steps)):
             # Create Input
             input = torch.concat((constants, forcings[i], model_pred_i_minus_1.squeeze(), forcings[i+1], model_pred_i_0.squeeze()), dim=0)
             model_pred_i_minus_1 = model_pred_i_0
             model_pred_i_0 = model(input, forcings[i+2], node_features)
             
+            model_targets.append(inputs[i+2].unsqueeze(0))
+            model_inputs.append(inputs[i+1].unsqueeze(0))
             model_predicted.append(model_pred_i_0)
             model_pred_i_0 = model_pred_i_0[..., original_output_to_reorder_output, :, :]
-            model_targets.append(inputs[i+2].unsqueeze(0))
         # Stack predictions
-        model_predicted = torch.stack(model_predicted, dim=1)
-        model_targets = torch.stack(model_targets, dim=1) # Currently reordered, but that is remedied in the loss_computation
-
-        return model_predicted, model_targets
+        
+        model_predicted = torch.stack(model_predicted, dim=1).to(device=device)
+        model_targets = torch.stack(model_targets, dim=1).to(device=device) # Currently reordered, but that is remedied in the loss_computation
+        model_inputs = torch.stack(model_inputs, dim=1).to(device=device)
+        
+        return model_predicted, model_targets, model_inputs
     # Evaluation forward pass
     @StaticCaptureEvaluateNoGrad(model=model, logger=logger, use_graphs=False)
     def eval_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps, permutation = reorder_output_to_original_output):
         # Forward pass
         model.eval()
         with torch.no_grad():
-            outputs, targets = unroll(
+            outputs, targets, model_inputs = unroll(
                 model, constants, inputs, forcings, node_features, nr_training_steps
             )
 
             # Get l2 loss
-            loss = model.loss(inputs, outputs, targets, criterion)
+            loss = model.loss(model_inputs, outputs, targets, criterion)
         
         # Targets are re-ordered. To get same order as output, we need to permute to the original order
-        return loss, outputs, targets[:, permutation, :, :]
+        return loss, outputs, targets[..., permutation, :, :]
 
     # Training forward pass
 
@@ -251,12 +258,12 @@ def main(cfg: DictConfig) -> None:
     def train_step_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
         # Forward pass
         model.train()
-        outputs, targets = unroll(
+        outputs, targets, model_inputs = unroll(
             model, constants, inputs, forcings, node_features, nr_training_steps
         )
 
         # Get l2 loss
-        loss = model.loss(inputs, outputs, targets, criterion)
+        loss = model.loss(model_inputs, outputs, targets, criterion)
 
         return loss
 
@@ -284,7 +291,7 @@ def main(cfg: DictConfig) -> None:
             batch_size=stage.batch_size,
             num_steps=stage.unroll_steps + cfg.model.nr_input_steps,
             shuffle=True,
-            device=dist.device,
+            device=device,
             process_rank=dist.rank,
             world_size=dist.world_size,
             batch=cfg.datapipe.batch,
@@ -319,7 +326,7 @@ def main(cfg: DictConfig) -> None:
                 nr_bytes = 0
 
                 # Training loop
-                for j, data in tqdm(enumerate(train_datapipe)):
+                for _, data in tqdm(enumerate(train_datapipe)):
                     # Check if ran max iterations for stage
                     if current_step >= stage.max_iterations:
                         break
@@ -378,9 +385,9 @@ def main(cfg: DictConfig) -> None:
                         inputs_surface = data[0]['inputs_surface']
                         inputs_pressure_levels = torch.reshape(data[0]['inputs_pressure_levels'], 
                                                                (cfg.validation.batch_size, cfg.model.nr_input_steps + 
-                                                                stage.unroll_steps, 
+                                                                cfg.validation.num_steps, 
                                                                 (cfg.curated_dataset.nr_pressure_levels 
-                                                                * cfg.curated_dataset.nr_inpurs_pressure_levels), 
+                                                                * cfg.curated_dataset.nr_inputs_pressure_levels), 
                                                                 cfg.model.input_shape[0], cfg.model.input_shape[1]))
                         forcings = data[0]['forcings'].permute((0, 1, 2, 4, 3))
                         node_features = data[0]['node_features']
@@ -407,21 +414,21 @@ def main(cfg: DictConfig) -> None:
                         
                         loss_epoch += loss.detach().cpu().numpy()
                         num_examples += targets.shape[0]
-
                         # Plot validation on first batch
                         if i == 0:
                             outputs = (
                                 outputs.cpu().numpy()
                             )
                             targets = targets.cpu().numpy()
-                            for chan in range(outputs.shape[2]):
+                            for chan in range(outputs.shape[-3]):
                                 plt.close("all")
                                 fig, ax = plt.subplots(
                                     3,
-                                    outputs.shape[1],
-                                    figsize=(15, outputs.shape[0] * 5),
+                                    outputs.shape[-4],
+                                    figsize=(15, outputs.shape[-5] * 5),
+                                    squeeze=False
                                 )
-                                for t in range(outputs.shape[1]):
+                                for t in range(outputs.shape[-4]):
                                     ax[0, t].set_title(
                                         "Network prediction, Step {}".format(t)
                                     )

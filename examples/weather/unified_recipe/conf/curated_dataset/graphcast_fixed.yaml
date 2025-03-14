@@ -4,6 +4,7 @@ val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val.zarr
 dt: 6
 
 resolution: 0.25
+
 train_years: ["2018-01-01", "2018-01-02"]
 val_years: ["2018-01-03", "2018-01-08"]
 

@@ -67,6 +67,17 @@ class WeightedMSELoss(torch.nn.Module):
         # self.criterion = torch.nn.MSELoss()
 
     def forward(self, predictions, targets):
+        if torch.isnan(predictions).any() or torch.isinf(predictions).any():
+            print("Warning: NaN or Inf values detected in predictions")
+            exit()    
+        
+        if torch.isnan(targets).any() or torch.isinf(targets).any():
+            print("Warning: NaN or Inf values detected in targets")
+            exit()    
         assert(targets.shape == predictions.shape)
-        assert(self.weights.shape == targets.shape[:len(self.weights.shape)])
+        assert(self.weights.shape == targets.shape[-len(self.weights.shape):])
+        # print((predictions - targets).shape)
+        # print(torch.pow((predictions - targets), 2).shape)
+        # print(self.weights.shape)
+        # exit()
         return torch.mean(torch.pow((predictions - targets), 2)*self.weights)

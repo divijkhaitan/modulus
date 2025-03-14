@@ -1,9 +1,10 @@
-train_dataset_filename: unified_recipe_datasets/graphcast_fixed_train.zarr
-val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val.zarr
+train_dataset_filename: unified_recipe_datasets/graphcast_fixed_base_train.zarr
+val_dataset_filename: unified_recipe_datasets/graphcast_fixed_base_val.zarr
 
 dt: 6
 
-resolution: 0.25
+resolution: 1.0
+
 train_years: ["2018-01-01", "2018-01-02"]
 val_years: ["2018-01-03", "2018-01-08"]
 
@@ -14,7 +15,7 @@ nr_inputs_pressure_levels: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 
 nr_forcings: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.forcings}])'}
 nr_constants: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.constants}])'}
 nr_node_features: ${eval:'sum([len(v[1]) if isinstance(v, list) else 1 for v in ${curated_dataset.variable_groups.node_features}])'}
-nr_excluded_inputs: 1
+nr_excluded_inputs: 0
 nr_pressure_levels: 13
 
 variable_groups:

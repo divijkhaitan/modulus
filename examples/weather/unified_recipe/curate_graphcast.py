@@ -49,6 +49,7 @@ class CurateERA5:
         dt: int = 1,  # 1 hour
         chunk_channels_together: bool = True,
         single_threaded: bool = False,
+        resolution: float = 0.25
     ):
         super().__init__()
 
@@ -67,7 +68,13 @@ class CurateERA5:
         # Open dataset to do curation from
         mapper = fs.get_mapper(self.dataset_filename)
         self.era5 = xr.open_zarr(mapper, consolidated=True)
-
+        old_lats = self.era5['latitude'].values
+        old_lons = self.era5['longitude'].values
+        new_lats = np.arange(old_lats.min(), old_lats.max() + 1e-8, resolution)
+        new_lons = np.arange(old_lons.min(), old_lons.max() + 1e-8, resolution)
+        self.era5 = self.era5.interp({'latitude': new_lats, 'longitude': new_lons}, 
+                                 method='linear',
+                                 kwargs={'fill_value': None})
         # Subset variables (this speeds up chunking)
         needed_variables = ["latitude", "longitude", "time", "level"]
 
@@ -241,6 +248,7 @@ def main(cfg: DictConfig) -> None:
         date_range=cfg.curated_dataset.train_years,
         dt=cfg.curated_dataset.dt,
         chunk_channels_together=cfg.curated_dataset.chunk_channels_together,
+        resolution=cfg.resolution
     )
     curate_train_era5()
 
@@ -254,6 +262,7 @@ def main(cfg: DictConfig) -> None:
         date_range=cfg.curated_dataset.val_years,
         dt=cfg.curated_dataset.dt,
         chunk_channels_together=cfg.curated_dataset.chunk_channels_together,
+        resolution=cfg.resolution
     )
     curate_val_era5()
 

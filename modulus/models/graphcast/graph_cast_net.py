@@ -305,8 +305,8 @@ class GraphCastNet(Module):
         self.checkpoint_encoder = checkpoint_encoder
         self.checkpoint_decoder = checkpoint_decoder
         # create the lat_lon_grid
-        self.latitudes = torch.linspace(lat_min, lat_max, input_res[0])
-        self.longitudes = torch.linspace(lon_min -180, lon_max - 180, steps=input_res[1] + 1)[:-1]
+        self.latitudes = torch.linspace(lat_min, lat_max, steps=input_res[0])
+        self.longitudes = torch.linspace(lon_min - 180, lon_max - 180, steps=input_res[1] + 1)[:-1]
         self.lat_lon_grid = torch.stack(
             torch.meshgrid(self.latitudes, self.longitudes, indexing="ij"), dim=-1
         )

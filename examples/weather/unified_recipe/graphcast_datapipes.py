@@ -190,20 +190,39 @@ class SeqZarrDatapipe_GraphCast(Datapipe):
                 device="cpu",
             )
 
-            if self.device.type == "cuda":
-                # Move tensors to GPU as external_source won't do that
-                data = [d.gpu() for d in data]
+            # if self.device.type == "cuda":
+            #     # Move tensors to GPU as external_source won't do that
+            #     data = [d.gpu() for d in data]
 
             # Set outputs
             pipe.set_outputs(*data)
 
         return pipe
-
     def __iter__(self):
         # Reset the pipeline before creating an iterator to enable epochs.
         self.pipe.reset()
+
         # Create DALI PyTorch iterator.
-        return dali_pth.DALIGenericIterator([self.pipe], self.pipe_outputs)
+        dali_iterator = dali_pth.DALIGenericIterator([self.pipe], self.pipe_outputs)
+
+        # Wrap the iterator to handle StopIteration
+        def iterator_wrapper():
+            try:
+                for batch in dali_iterator:
+                    yield batch
+            except StopIteration:
+                # Handle the end of the pipeline gracefully
+                print("DALI Pipeline finished for this epoch.") # Or logging.info
+                # You can also perform cleanup or other actions here
+                return # Exit the iterator
+
+        return iterator_wrapper()
+    
+    # def __iter__(self):
+    #     # Reset the pipeline before creating an iterator to enable epochs.
+    #     self.pipe.reset()
+    #     # Create DALI PyTorch iterator.
+    #     return dali_pth.DALIGenericIterator([self.pipe], self.pipe_outputs)
 
     def __len__(self):
         return self.total_length
@@ -373,3 +392,4 @@ class SeqZarrSourceGraphCast:
             return self.batch_mapping.shape[0] * self.batch_size
         else:
             return len(self.indices)
+        

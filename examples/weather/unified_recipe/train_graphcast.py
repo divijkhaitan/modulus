@@ -104,8 +104,8 @@ def main(cfg: DictConfig) -> None:
         print(f"Loaded Model from {cfg.model.pretrain_load_path}")
     except Exception as e:
         print(e)
-    # device = dist.device
-    device = 'cpu'
+    device = dist.device
+    # device = 'cpu'
     model = model.to(device)
     # Distributed learning
     if dist.world_size > 1:
@@ -220,7 +220,7 @@ def main(cfg: DictConfig) -> None:
             # Create Input
             input = torch.concat((constants, forcings[i], model_pred_i_minus_1.squeeze(), forcings[i+1], model_pred_i_0.squeeze()), dim=0)
             model_pred_i_minus_1 = model_pred_i_0
-            model_pred_i_0 = model(input, forcings[i+2], node_features)
+            model_pred_i_0 = model(input.to(device), forcings[i+2].to(device), node_features.to(device))
             
             model_targets.append(inputs[i+2].unsqueeze(0))
             model_inputs.append(inputs[i+1].unsqueeze(0))
@@ -410,7 +410,7 @@ def main(cfg: DictConfig) -> None:
                             targets,
                         ) = eval_forward(model, constants.squeeze()[0], 
                                          inputs, forcings.squeeze(), node_features.squeeze()[0], 
-                                         criterion, stage.unroll_steps, permutation=permutation)
+                                         criterion, cfg.validation.num_steps, permutation=permutation)
                         
                         loss_epoch += loss.detach().cpu().numpy()
                         num_examples += targets.shape[0]

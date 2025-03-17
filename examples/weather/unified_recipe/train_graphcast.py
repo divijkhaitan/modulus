@@ -106,6 +106,16 @@ def main(cfg: DictConfig) -> None:
         print(e)
     device = dist.device
     # device = 'cpu'
+    if cfg.model.force_single_checkpoint:
+        model.set_checkpoint_model(True)
+    else:
+        if cfg.model.checkpoint_encoder:
+            model.set_checkpoint_encoder(True)
+        if cfg.model.checkpoint_decoder:
+            model.set_checkpoint_decoder(True)
+        if cfg.model.checkpoint_processor_segments:
+            model.set_checkpoint_processor(cfg.model.checkpoint_processor_segments)
+
     model = model.to(device)
     # Distributed learning
     if dist.world_size > 1:
@@ -216,35 +226,38 @@ def main(cfg: DictConfig) -> None:
         model_predicted = []
         model_targets = []
         model_inputs = []
+        model_norm_predictions = []
         for i in range(min(num_steps, max_steps)):
             # Create Input
+            print(f"Step {i} \n----------------")
             input = torch.concat((constants, forcings[i], model_pred_i_minus_1.squeeze(), forcings[i+1], model_pred_i_0.squeeze()), dim=0)
             model_pred_i_minus_1 = model_pred_i_0
-            model_pred_i_0 = model(input.to(device), forcings[i+2].to(device), node_features.to(device))
+            model_pred_i_0, norm_predictions = model(input, forcings[i+2], node_features)
             
             model_targets.append(inputs[i+2].unsqueeze(0))
             model_inputs.append(inputs[i+1].unsqueeze(0))
             model_predicted.append(model_pred_i_0)
+            model_norm_predictions.append(norm_predictions)
             model_pred_i_0 = model_pred_i_0[..., original_output_to_reorder_output, :, :]
         # Stack predictions
         
-        model_predicted = torch.stack(model_predicted, dim=1).to(device=device)
-        model_targets = torch.stack(model_targets, dim=1).to(device=device) # Currently reordered, but that is remedied in the loss_computation
-        model_inputs = torch.stack(model_inputs, dim=1).to(device=device)
-        
-        return model_predicted, model_targets, model_inputs
+        model_predicted = torch.stack(model_predicted, dim=1)
+        model_targets = torch.stack(model_targets, dim=1) # Currently reordered, but that is remedied in the loss_computation
+        model_inputs = torch.stack(model_inputs, dim=1).cpu()
+        model_norm_predictions = torch.stack(model_norm_predictions, dim=1)
+        return model_predicted, model_targets, model_inputs, model_norm_predictions
     # Evaluation forward pass
     @StaticCaptureEvaluateNoGrad(model=model, logger=logger, use_graphs=False)
     def eval_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps, permutation = reorder_output_to_original_output):
         # Forward pass
         model.eval()
         with torch.no_grad():
-            outputs, targets, model_inputs = unroll(
+            outputs, targets, model_inputs, model_norm_predictions = unroll(
                 model, constants, inputs, forcings, node_features, nr_training_steps
             )
 
             # Get l2 loss
-            loss = model.loss(model_inputs, outputs, targets, criterion)
+            loss = model.loss(model_inputs, model_norm_predictions, targets, criterion)
         
         # Targets are re-ordered. To get same order as output, we need to permute to the original order
         return loss, outputs, targets[..., permutation, :, :]
@@ -254,17 +267,17 @@ def main(cfg: DictConfig) -> None:
 
     @StaticCaptureTraining(
         model=model, optim=optimizer, logger=logger, use_amp=cfg.training.amp_supported
-    )  # TODO: remove amp supported config after SFNO fixed
+    )
     def train_step_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
+        # Handles forward and backward pass
         # Forward pass
         model.train()
-        outputs, targets, model_inputs = unroll(
+        _, targets, model_inputs, model_norm_predictions = unroll(
             model, constants, inputs, forcings, node_features, nr_training_steps
         )
-
-        # Get l2 loss
-        loss = model.loss(model_inputs, outputs, targets, criterion)
-
+        # Get l2 loss, returning loss performs backward pass
+        torch.cuda.empty_cache()
+        loss = model.loss(model_inputs, model_norm_predictions, targets, criterion)
         return loss
 
 

@@ -23,6 +23,10 @@ input_std: ../../../../stddev_by_level.nc
 output_std: ../../../../diffs_stddev_by_level.nc
 pretrain_load_path: ../../../../gc_weights/graphcast_0.25_13.mdlus
 nr_input_steps: 2
+force_single_checkpoint: True
+checkpoint_encoder: False
+checkpoint_decoder: False
+checkpoint_processor_segments: -1
 
 args:
   # meshgraph_path: "icospheres.json"
@@ -38,7 +42,4 @@ args:
   use_cugraphops_encoder: False
   use_cugraphops_processor: False
   use_cugraphops_decoder: False
-  recompute_activation: False
-  checkpoint_model: True
-  checkpoint_encoder : True
-  checkpoint_decoder: True
+  recompute_activation: True

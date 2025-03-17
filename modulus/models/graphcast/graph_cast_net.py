@@ -272,9 +272,6 @@ class GraphCastNet(Module):
         global_features_on_rank_0: bool = False,
         produce_aggregated_output: bool = True,
         produce_aggregated_output_on_all_ranks: bool = True,
-        checkpoint_model: bool = True,
-        checkpoint_encoder: bool = True,
-        checkpoint_decoder: bool = True
 
     ):
         super().__init__(meta=MetaData())
@@ -301,9 +298,6 @@ class GraphCastNet(Module):
             produce_aggregated_output_on_all_ranks
         )
         self.partition_group_name = partition_group_name
-        self.checkpoint_model = checkpoint_model
-        self.checkpoint_encoder = checkpoint_encoder
-        self.checkpoint_decoder = checkpoint_decoder
         # create the lat_lon_grid
         self.latitudes = torch.linspace(lat_min, lat_max, steps=input_res[0])
         self.longitudes = torch.linspace(lon_min - 180, lon_max - 180, steps=input_res[1] + 1)[:-1]
@@ -412,10 +406,9 @@ class GraphCastNet(Module):
         self.output_dim_grid_nodes = output_dim_grid_nodes
         self.input_res = input_res
 
-        # by default: don't checkpoint at all
-        self.model_checkpoint_fn = set_checkpoint_fn(self.checkpoint_model)
         self.encoder_checkpoint_fn = set_checkpoint_fn(False)
         self.decoder_checkpoint_fn = set_checkpoint_fn(False)
+        self.model_checkpoint_fn = set_checkpoint_fn(False)
 
         # initial feature embedder
         self.encoder_embedder = GraphCastEncoderEmbedder(

@@ -139,7 +139,7 @@ class Norm_Wrapper_GraphCast(Module):
                     tensor.append(aux_dataset[name].sel(level=int(level[1])).item())
                 else:
                     tensor.append(dataset[name].sel(level=int(level[1])).item())
-        return torch.tensor(tensor, device=self.model.device)
+        return torch.tensor(tensor)
 
     def _outputs_from_input_tensor(self, inputs: torch.Tensor, index_array) -> torch.Tensor:
         data = []
@@ -153,7 +153,7 @@ class Norm_Wrapper_GraphCast(Module):
             else:
                 item = self.output_variables[idx]
                 data.append(torch.ones_like(inputs[..., 0, :, :])*(self._get_tensor_from_dataset([item], [], self._locations).item()))
-        x = torch.stack(data, dim=-3).to(self.model.device)
+        x = torch.stack(data, dim=-3)
         return x.squeeze()
 
     def _normalize(self,
@@ -163,7 +163,7 @@ class Norm_Wrapper_GraphCast(Module):
                   ) -> torch.Tensor:
         """Normalize variables using the given scales and (optionally) locations."""
         if locations is None:
-            locations = torch.zeros_like(scales, device=self.model.device)
+            locations = torch.zeros_like(scales)
         return (data - locations)/scales
     
     def _unnormalize(self,
@@ -173,7 +173,7 @@ class Norm_Wrapper_GraphCast(Module):
                   ) -> torch.Tensor:
         """Normalize variables using the given scales and (optionally) locations."""
         if locations is None:
-            locations = torch.zeros_like(scales, device=self.model.device)
+            locations = torch.zeros_like(scales)
         return (data * scales) + locations
     
     def _unnormalize_prediction_and_add_input(self, inputs: torch.Tensor,
@@ -210,9 +210,9 @@ class Norm_Wrapper_GraphCast(Module):
         # Unnormalize and add input (if residual).
         
         # norm_inputs has shape 176 in original order
-        predictions = self._unnormalize_prediction_and_add_input(inputs, norm_predictions)
+        predictions = self._unnormalize_prediction_and_add_input(inputs, norm_predictions.detach().cpu())
         
-        return predictions
+        return predictions, norm_predictions
 
     def loss(self, inputs: torch.Tensor, outputs: torch.Tensor, targets: torch.Tensor, criterion: torch.nn.Module, **kwargs) -> torch.Tensor:
         """Computes the loss on normalized inputs and outputs.
@@ -243,9 +243,8 @@ class Norm_Wrapper_GraphCast(Module):
         
         # Inputs are the targets shifted backwards, so the same applies to them
         inputs = inputs[..., self.output_permutation, :, :]
+        norm_actual_residuals = self._subtract_input_and_normalize_target(inputs, targets.cpu())
+        # norm_predicted_residuals = self._subtract_input_and_normalize_target(inputs, outputs)
         
-        norm_actual_residuals = self._subtract_input_and_normalize_target(inputs, targets)
-        norm_predicted_residuals = self._subtract_input_and_normalize_target(inputs, outputs)
-                
-        loss = criterion(norm_predicted_residuals, norm_actual_residuals, **kwargs)
+        loss = criterion(outputs.to(self.model.device), norm_actual_residuals.to(self.model.device), **kwargs)
         return loss

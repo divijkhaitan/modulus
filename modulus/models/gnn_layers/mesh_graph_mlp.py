@@ -87,7 +87,7 @@ class CustomSiLuLinearAutogradFunction(torch.autograd.Function):
             # grad_features = grad_output @ weight
             with torch.amp.autocast(device_type = 
                                     'cpu' if str(grad_output.device) == 'cpu' else 'cuda', enabled=True):
-                grad_weight = torch.matmul(grad_output, weight)
+                grad_features = torch.matmul(grad_output, weight)
 
             with FusionDefinition() as fd:
                 silu_backward_for(

@@ -26,8 +26,8 @@ defaults:
   #- filesystem/object_storage
 
   # Dataset
-  - dataset/6hr_subsample_2022
-  # - dataset/6hr_subsample 
+  # - dataset/6hr_subsample_2022
+  - dataset/6hr_subsample 
   # - dataset/tiny_6hr_subsample
   
   # Curated Dataset

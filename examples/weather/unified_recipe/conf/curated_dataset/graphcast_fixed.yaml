@@ -1,12 +1,12 @@
-train_dataset_filename: unified_recipe_datasets/graphcast_fixed_train_2022.zarr
-val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val_2022.zarr
+train_dataset_filename: unified_recipe_datasets/graphcast_fixed_train.zarr
+val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val.zarr
 
 dt: 6
 
 resolution: 0.25
 
-train_years: ["2021-12-30", "2021-12-31"]
-val_years: ["2022-01-01", "2022-01-02"]
+train_years: ["2015-12-24", "2015-12-31"]
+val_years: ["2018-01-01", "2018-01-05"]
 
 chunk_channels_together: True
 
@@ -35,12 +35,6 @@ variable_groups:
   - "u_component_of_wind" #
   - "v_component_of_wind" #
   - "specific_humidity" #
-  # - ["vertical_velocity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
-  # - ["geopotential", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
-  # - ["temperature", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
-  # - ["u_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
-  # - ["v_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
-  # - ["specific_humidity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
   forcings: # (3 * 5) = 15
   - "toa_incident_solar_radiation" #
   - "day_progress_sin" #

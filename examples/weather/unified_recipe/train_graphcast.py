@@ -104,8 +104,8 @@ def main(cfg: DictConfig) -> None:
         print(f"Loaded Model from {cfg.model.pretrain_load_path}")
     except Exception as e:
         print(e)
-    # device = dist.device
-    device = 'cpu'
+    device = dist.device
+    # device = 'cpu'
     if cfg.model.force_single_checkpoint:
         model.set_checkpoint_model(True)
     else:

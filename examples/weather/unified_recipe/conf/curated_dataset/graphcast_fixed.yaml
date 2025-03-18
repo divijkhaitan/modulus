@@ -1,12 +1,12 @@
-train_dataset_filename: unified_recipe_datasets/graphcast_fixed_train.zarr
-val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val.zarr
+train_dataset_filename: unified_recipe_datasets/graphcast_fixed_train_2022.zarr
+val_dataset_filename: unified_recipe_datasets/graphcast_fixed_val_2022.zarr
 
 dt: 6
 
 resolution: 0.25
 
-train_years: ["2018-01-01", "2018-01-02"]
-val_years: ["2018-01-03", "2018-01-08"]
+train_years: ["2021-12-30", "2021-12-31"]
+val_years: ["2022-01-01", "2022-01-02"]
 
 chunk_channels_together: True
 

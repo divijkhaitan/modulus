@@ -104,8 +104,8 @@ def main(cfg: DictConfig) -> None:
         print(f"Loaded Model from {cfg.model.pretrain_load_path}")
     except Exception as e:
         print(e)
-    device = dist.device
-    # device = 'cpu'
+    # device = dist.device
+    device = 'cpu'
     if cfg.model.force_single_checkpoint:
         model.set_checkpoint_model(True)
     else:
@@ -209,8 +209,8 @@ def main(cfg: DictConfig) -> None:
     loss_weights = loss_weights.to(device)
     criterion = WeightedMSELoss(loss_weights)
     model = Norm_Wrapper_GraphCast(model, input_std, input_mean, output_std, 
-                                   ORIGINAL_ORDER_INPUTS_178, ORIGINAL_ORDER_OUTPUTS_83, 
-                                   reorder_178_to_original_178, original_178_to_original_83, 
+                                   ORIGINAL_ORDER_INPUTS_176, ORIGINAL_ORDER_OUTPUTS_83, 
+                                   reorder_178_to_original_176, original_176_to_original_83, 
                                    reorder_178_to_original_output, reorder_output_to_original_output)
     permutation = reorder_output_to_original_output
     variable_order = ORIGINAL_ORDER_OUTPUTS_83
@@ -250,7 +250,6 @@ def main(cfg: DictConfig) -> None:
     @StaticCaptureEvaluateNoGrad(model=model, logger=logger, use_graphs=False)
     def eval_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps, permutation = reorder_output_to_original_output):
         # Forward pass
-        model.eval()
         with torch.no_grad():
             outputs, targets, model_inputs, model_norm_predictions = unroll(
                 model, constants, inputs, forcings, node_features, nr_training_steps
@@ -271,7 +270,6 @@ def main(cfg: DictConfig) -> None:
     def train_step_forward(model, constants, inputs, forcings, node_features, criterion, nr_training_steps):
         # Handles forward and backward pass
         # Forward pass
-        model.train()
         _, targets, model_inputs, model_norm_predictions = unroll(
             model, constants, inputs, forcings, node_features, nr_training_steps
         )
@@ -388,7 +386,7 @@ def main(cfg: DictConfig) -> None:
                 # Wrap validation in launch logger for console / WandB logs
                 with LaunchLogger("valid", epoch=epoch) as log:
                     # Switch to eval mode
-                    model.eval()
+                    model.model.eval()
 
                     # Validation loop
                     loss_epoch = 0.0
@@ -464,7 +462,7 @@ def main(cfg: DictConfig) -> None:
                     log.log_epoch({"Validation error": loss_epoch / num_examples})
 
                     # Switch back to train mode
-                    model.train()
+                    model.model.train()
 
             # Sync after each epoch
             if dist.world_size > 1:
@@ -475,7 +473,7 @@ def main(cfg: DictConfig) -> None:
                 # Use Modulus Launch checkpoint
                 save_checkpoint(
                     "./checkpoints",
-                    models=[model],
+                    models=[model.model],
                     optimizer=optimizer,
                     scheduler=None,
                     epoch=epoch,

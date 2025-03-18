@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dataset_filename: "unified_recipe_datasets/arco_era5.zarr"
+dataset_filename: "unified_recipe_datasets/arco_era5_2022.zarr"
 
 dt: 6
 
-years: ["2018-01-01", "2018-01-08"]
+years: ["2021-12-30", "2022-01-02"]
 
 chunking: [1, 1, 721, 1440]
 

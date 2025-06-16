@@ -15,7 +15,7 @@
 # limitations under the License.
 
 amp_supported: !!bool True
-batch_size: 1
+batch_size: 2
 
 optimizer:
   name: Adam
@@ -25,23 +25,30 @@ optimizer:
     lr: 2e-5
 
 stages:
-  - name: "Learning Rate Warmup"
+  # - name: "Learning Rate Warmup"
+  #   max_iterations: .inf
+  #   num_epochs: 1
+  #   unroll_steps: 4
+  #   batch_size: 1
+  #   lr_scheduler_name: LinearLR
+  #   args:
+  #     start_factor: 0.001
+  #     end_factor: 1.0
+  #     total_iters: 1
+
+  - name: "Constant LR TRAIN"
     max_iterations: .inf
-    num_epochs: 1
+    num_epochs: 100
     unroll_steps: 1
     batch_size: 1
-    lr_scheduler_name: LinearLR
-    args:
-      start_factor: 0.001
-      end_factor: 1.0
-      total_iters: 1
+    lr_scheduler_name: None
 
-  - name: "Cosine Annealing LR"
-    max_iterations: .inf
-    num_epochs: 20
-    unroll_steps: 2
-    batch_size: 1
-    lr_scheduler_name: CosineAnnealingLR
-    args:
-      T_max: 300
-      eta_min: 0.0
+  # - name: "Cosine Annealing LR"
+  #   max_iterations: .inf
+  #   num_epochs: 40
+  #   unroll_steps: 1
+  #   batch_size: 1
+  #   lr_scheduler_name: CosineAnnealingLR
+  #   args:
+  #     T_max: 300
+  #     eta_min: 0.0

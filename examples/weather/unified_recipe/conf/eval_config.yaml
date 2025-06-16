@@ -28,14 +28,14 @@ defaults:
 
   # Dataset
   # - dataset/6hr_subsample_2022
-  # - dataset/era5_2020
-  - dataset/6hr_subsample 
+  - dataset/era5_2020
+  # - dataset/6hr_subsample 
   # - dataset/tiny_6hr_subsample
   
   # Curated Dataset
   # - curated_dataset/graphcast_fixed_base.yaml
-  # - curated_dataset/graphcast_2020_eval.yaml
-  - curated_dataset/graphcast_fixed.yaml
+  - curated_dataset/graphcast_2020_eval.yaml
+  # - curated_dataset/graphcast_fixed.yaml
   # - curated_dataset/graphcast_13.yaml
   # - curated_dataset/tiny_2_var
   # - curated_dataset/healpix_19_var

@@ -183,7 +183,7 @@ class CurateERA5:
                 delayed_obj.compute()
 
 
-@hydra.main(version_base="1.2", config_path="conf", config_name="config")
+@hydra.main(version_base="1.2", config_path="conf", config_name="eval_config")
 def main(cfg: DictConfig) -> None:
     # Resolve config so that all values are concrete
     OmegaConf.resolve(cfg)

@@ -1,4 +1,4 @@
-from typing import Iterable, Dict, List, Optional, Tuple
+from typing import Iterable, Dict, List, Optional, Tuple, Any
 import torch
 import numpy as np
 
@@ -10,17 +10,24 @@ def normalized_level_weights(data: Iterable) -> torch.Tensor:
   return levels / levels.mean()
 
 def get_latitude_weights(latitude):
-  sorted_order = sorted(latitude)
-  diff = sorted_order[1] - sorted_order[0]
-  if (sorted_order != np.linspace(sorted_order[0], sorted_order[-1], len(latitude))).any(): 
-    raise ValueError(f'Latitude vector {latitude} does not start/end at +- 90 degrees.')
-  weights = [np.cos(np.deg2rad(lat)) * np.sin(np.deg2rad(diff/2)) if lat not in [-90, 90] 
-             else np.sin(np.deg2rad(diff/4)) ** 2 for lat in latitude]
-  return np.array(weights)
+    sorted_order = sorted(latitude)
+    diff = sorted_order[1] - sorted_order[0]
+    if (sorted_order != np.linspace(sorted_order[0], sorted_order[-1], len(latitude))).any(): 
+        raise ValueError(f'Latitude vector {latitude} does not start/end at +- 90 degrees.')
+    # weights = [np.cos(np.deg2rad(lat)) * np.sin(np.deg2rad(diff/2)) if lat not in [-90, 90] 
+    #             else np.sin(np.deg2rad(diff/4)) ** 2 for lat in latitude]
+    weights = [np.cos(np.deg2rad(lat)) * np.sin(np.deg2rad(diff/2)) if lat not in np.linspace(7.5, 37.5, 31) 
+             else 0 for lat in latitude]
+    return np.array(weights)
+
+def get_longitude_weights(longitude):
+    # weights = [1 for _ in longitude]
+    weights = [1 if lon in np.linspace(37.5, 67.5, 31) else 0 for lon in longitude]
+    return np.array(weights)
 
 
 def get_weights(shape: Tuple[int, int, int], lat_coords: List, level_mapping: List, 
-                  variable_weights: Optional[Dict] = None):
+                  variable_weights: Optional[Dict] = None, lon_coords: Optional[Any] = None):
     """
     Get weights for a tensor based on coordinates and channel characteristics.
     
@@ -40,7 +47,11 @@ def get_weights(shape: Tuple[int, int, int], lat_coords: List, level_mapping: Li
     
     # Latitude weights (same for all channels)
     lat_weights = get_latitude_weights(lat_coords)
-    
+    if lon_coords is not None:
+        lon_weights = get_longitude_weights(lon_coords)
+        lon_weights_tensor = torch.tensor(lon_weights, dtype=torch.float32)
+        lon_weights_tensor = lon_weights_tensor.view(1, 1, lon_len).expand(channels, lat_len, lon_len)
+        weights *= lon_weights_tensor
     # Broadcast latitude weights to match tensor dimensions (channels, lat, lon)
     lat_weights_tensor = torch.tensor(lat_weights, dtype=torch.float32)
     lat_weights_tensor = lat_weights_tensor.view(1, lat_len, 1).expand(channels, lat_len, lon_len)
@@ -68,6 +79,13 @@ class WeightedMSELoss(torch.nn.Module):
 
     def forward(self, predictions, targets):
         if torch.isnan(predictions).any() or torch.isinf(predictions).any():
+            is_nan = torch.isnan(predictions)
+            # Check for Inf values (positive or negative)
+            is_inf = torch.isinf(predictions)
+
+            # Combine the checks: Find where it's either NaN OR Inf
+            is_bad = torch.logical_or(is_nan, is_inf)
+            print(is_bad)
             print("Warning: NaN or Inf values detected in predictions")
             exit()    
         

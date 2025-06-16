@@ -1,12 +1,12 @@
-train_dataset_filename: /Datastorage/divij.khaitan_asp25/graphcast_fixed_train.zarr
-val_dataset_filename: /Datastorage/divij.khaitan_asp25/graphcast_fixed_val.zarr
+train_dataset_filename: /Datastorage/divij.khaitan_asp25/era5/graphcast_2020_eval_train.zarr
+val_dataset_filename: /Datastorage/divij.khaitan_asp25/era5/graphcast_2020_eval_val.zarr
 
 dt: 6
 
 resolution: 0.25
 
-train_years: ["2014-01-01", "2014-10-31"]
-val_years: ["2014-11-01", "2015-01-08"]
+train_years: ["2018-01-01", "2018-01-02"]
+val_years: ["2022-01-01", "2023-01-01"]
 
 chunk_channels_together: True
 
@@ -35,6 +35,12 @@ variable_groups:
   - "u_component_of_wind" #
   - "v_component_of_wind" #
   - "specific_humidity" #
+  # - ["vertical_velocity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["geopotential", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["temperature", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["u_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["v_component_of_wind", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
+  # - ["specific_humidity", [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]]
   forcings: # (3 * 5) = 15
   - "toa_incident_solar_radiation" #
   - "day_progress_sin" #

@@ -1,0 +1,11 @@
+batch_size: 1
+num_steps: 12
+# eval_load_path: model_package_India-Finetune-100epoch/model.mdlus
+# is_base: False
+eval_load_path: ../../../../gc_weights/graphcast_0.25_13_concat_trick.mdlus
+is_base: True
+save_dir: '/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch'
+plots_name: 'comparison_plots.html'
+pred_name: 'predictions_base_model.npy'
+actual_name: 'actuals.npy'
+time_name: 'time.npy'

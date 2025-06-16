@@ -172,3 +172,11 @@ multirun/
 
 # SLURM
 slurm-*.out
+
+examples/weather/unified_recipe/plots
+examples/weather/unified_recipe/model_package_*
+examples/weather/unified_recipe/logs
+examples/weather/unified_recipe/visualizations
+examples/weather/unified_recipe/tmax
+examples/weather/unified_recipe/tmin
+examples/weather/unified_recipe/checkpoints*/*

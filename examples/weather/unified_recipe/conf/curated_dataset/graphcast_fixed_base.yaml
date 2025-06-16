@@ -1,5 +1,5 @@
-train_dataset_filename: unified_recipe_datasets/graphcast_fixed_base_train.zarr
-val_dataset_filename: unified_recipe_datasets/graphcast_fixed_base_val.zarr
+train_dataset_filename: /Datastorage/divij.khaitan_asp25/graphcast_fixed_base_train.zarr
+val_dataset_filename: /Datastorage/divij.khaitan_asp25/graphcast_fixed_base_val.zarr
 
 dt: 6
 

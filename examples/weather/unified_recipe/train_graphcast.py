@@ -225,6 +225,7 @@ def main(cfg: DictConfig) -> None:
                                    reorder_178_to_original_output, reorder_output_to_original_output)
     permutation = reorder_output_to_original_output
     variable_order = ORIGINAL_ORDER_OUTPUTS_83
+    print("Unrolling Network")
     # Unroll network
     save_inference_model_package(
                     # model,
@@ -318,7 +319,7 @@ def main(cfg: DictConfig) -> None:
     global_epoch = 0
     total_steps_taken = 0
     for stage in cfg.training.stages:
-        print(f'Starting Stage {stage}')
+        # print(f'Starting Stage {stage} of {cfg.training.stages}')
         stage_start_epoch = global_epoch
         current_stage_step = 0
         # Skip if loaded epoch is greater than current stage
@@ -333,6 +334,8 @@ def main(cfg: DictConfig) -> None:
                 num_epochs = stage.num_epochs - (loaded_epoch - global_epoch)
         else:
             num_epochs = stage.num_epochs
+
+        # print(f"{num_epochs} epochs of {stage.num_epochs} done")
         
         # Create new datapipe
         train_datapipe = SeqZarrDatapipe_GraphCast(
@@ -365,7 +368,7 @@ def main(cfg: DictConfig) -> None:
         current_step = len(train_datapipe) * (stage.num_epochs - num_epochs)
 
         # Run number of epochs
-        for epoch in range(num_epochs):
+        for epoch in tqdm(range(num_epochs), desc="Epochs"):
             current_epoch_global = stage_start_epoch + epoch
             # Wrap epoch in launch logger for console / WandB logs
             # print("Training")
@@ -382,7 +385,7 @@ def main(cfg: DictConfig) -> None:
                 tic = time.time()
                 nr_bytes = 0
                 # Training loop
-                for _, data in tqdm(enumerate(train_datapipe)):
+                for _, data in enumerate(train_datapipe):
                     # Check if ran max iterations for stage
                     if current_step >= stage.max_iterations:
                         break

@@ -3,202 +3,170 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import gc 
 
-from visualise_spatial_errors import filter_dates
+import xarray as xr
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+from typing import Dict, Optional
+try:
+    import cartopy.crs as ccrs
+    CARTOPY_INSTALLED = True
+except ImportError:
+    CARTOPY_INSTALLED = False
 
-def plot_total_rmse_by_lead_time(
-    ground_truth_ds,
-    forecast_datasets,
-    variable_name="2m_temperature",
-    output_dir="total_rmse_plots",
-    suffix=""
-):
+def plot_error_timeseries(
+    groundtruth_path: str,
+    forecast_paths: Dict[str, str],
+    output_folder: str,
+    sub_region: Optional[Dict[str, slice]] = None,
+    suffix: Optional[str] = None
+) -> None:
     """
-    Generates and saves a line plot showing the total RMSE for each forecast
-    lead time, comparing all forecast datasets and a persistence benchmark to
-    the ground truth. The total RMSE for a given lead time is calculated by
+    Calculates forecast error vs. lead time and plots it as a time series.
 
-    averaging the spatial RMSE over latitude and longitude.
+    This function computes the Mean Absolute Error (MAE) for each model at
+    various lead times and generates a single line plot comparing all models.
 
     Args:
-        ground_truth_ds (xr.Dataset): Dataset for ground truth.
-        forecast_datasets (dict): Dictionary of forecast datasets.
-        variable_name (str): The variable to plot (default: "2m_temperature").
-        output_dir (str): Directory to save the plot (default: "total_rmse_plots").
-        suffix (str): An optional suffix for the output filename.
-    Returns:
-        None
+        groundtruth_path (str): Path to the ground truth zarr dataset.
+        forecast_paths (Dict[str, str]): Dictionary of model names and paths.
+        output_folder (str): Folder to save the output plot.
+        sub_region (Optional[Dict[str, slice]]): Optional dictionary to select
+            a spatial sub-region for analysis.
+            Example: {'latitude': slice(40, 5), 'longitude': slice(60, 100)}
+        suffix (Optional[str]): Optional string to append to the output filename.
     """
-    os.makedirs(output_dir, exist_ok=True)
-
-    common_lats = np.linspace(-90, 90, 721)
-    common_lons = np.linspace(0, 359.75, 1440)
-
-    processed_forecast_datasets = {}
-    for ds_name, ds in forecast_datasets.items():
-        if variable_name not in ds.data_vars:
-            print(f"Warning: Variable '{variable_name}' not found in '{ds_name}'. Skipping.")
-            continue
-        interp_ds = ds[variable_name].interp(
-            {'latitude': common_lats, 'longitude': common_lons},
-            method='linear',
-            kwargs={'fill_value': None}
-        )
-        if 'time' in interp_ds.coords and 'base_time' not in interp_ds.coords:
-            interp_ds = interp_ds.rename({'time': 'base_time'})
-        if 'base_time' not in interp_ds.coords:
-            print(f"Warning: Dataset '{ds_name}' needs 'base_time' or 'time'. Skipping.")
-            continue
-        processed_forecast_datasets[ds_name] = interp_ds
-
-    if variable_name not in ground_truth_ds.data_vars:
-        raise ValueError(f"Variable '{variable_name}' not in ground truth dataset.")
-    processed_gt_da = ground_truth_ds[variable_name].interp(
-        {'latitude': common_lats, 'longitude': common_lons},
-        method='linear',
-        kwargs={'fill_value': None}
-    )
-
-    if 'base_time' in processed_gt_da.dims and 'step' in processed_gt_da.coords:
-        first_step = pd.to_timedelta(processed_gt_da.step.data[0])
-        print(f"Note: Ground truth has 'base_time' and 'step'. Using first available step ({first_step}) as observation time.")
-        processed_gt_da = processed_gt_da.isel(step=0, drop=True)
-        processed_gt_da = processed_gt_da.rename({'base_time': 'time'})
-    elif 'base_time' in processed_gt_da.dims and 'time' not in processed_gt_da.dims:
-        print("Note: Renaming 'base_time' to 'time' in ground truth.")
-        processed_gt_da = processed_gt_da.rename({'base_time': 'time'})
-    elif 'time' not in processed_gt_da.dims:
-        raise ValueError("Ground truth must have a 'time' or 'base_time' dimension.")
-
-    all_steps_values = sorted(list(set(
-        pd.Timedelta(s) for ds in processed_forecast_datasets.values()
-        if 'step' in ds.coords for s in ds.step.data
-        if pd.Timedelta(s) != pd.Timedelta(0)
-    )))
-
-    if not all_steps_values:
-        print("No valid forecast lead times found to plot. Exiting.")
+    # --- 1. Setup and Data Loading ---
+    os.makedirs(output_folder, exist_ok=True)
+    try:
+        gt_ds = xr.open_zarr(groundtruth_path)
+        # Ensure coordinates are sorted for robust processing
+        gt_ds.coords['step'] = gt_ds.coords['step'] + pd.to_timedelta(6, unit='h')
+        gt_ds = gt_ds.sortby(['latitude', 'longitude'])
+        if sub_region:
+            print(f"Subsetting ground truth to region: {sub_region}")
+            gt_ds = gt_ds.sel(sub_region)
+    except Exception as e:
+        print(f"FATAL: Could not load or subset ground truth data. {e}")
         return
 
-    model_names = list(processed_forecast_datasets.keys())
-    total_rmse_results = {model_name: [] for model_name in model_names + ['persistence']}
-    lead_times_hours = []
+    # --- 2. Initialize Data Structures ---
+    lead_times_h = np.arange(6, 73, 6)
+    lead_times_td = [pd.to_timedelta(f'{h}h') for h in lead_times_h]
+    model_names = ['Persistence (24h)'] + list(forecast_paths.keys())
+    # DataFrame to store the scalar error values
+    errors_df = pd.DataFrame(index=model_names, columns=lead_times_h, dtype=float)
 
-    for selected_forecast_step in all_steps_values:
-        step_for_sel = pd.to_timedelta(selected_forecast_step)
-        hr_lead = int(step_for_sel / np.timedelta64(1, 'h'))
-        lead_times_hours.append(hr_lead)
-        print(f"Calculating total RMSE for lead time: {hr_lead} hours...")
-
-        # --- Persistence Benchmark Calculation ---
-        ref_base_times = None
-        for model_ds in processed_forecast_datasets.values():
-            if 'step' in model_ds.coords and step_for_sel in model_ds.step.data:
-                ref_base_times = model_ds.sel(step=step_for_sel)['base_time'].data
-                break
-        
-        if ref_base_times is not None:
-            try:
-                valid_times = ref_base_times + step_for_sel
-                persistence_times = ref_base_times
-
-                gt_at_valid_time = processed_gt_da.interp(time=valid_times, method='linear')
-                gt_persistence_forecast = processed_gt_da.interp(time=persistence_times, method='linear')
-                
-                gt_persistence_forecast['time'] = gt_at_valid_time['time']
-                
-                aligned_gt, aligned_persistence = xr.align(gt_at_valid_time, gt_persistence_forecast, join='inner')
-                
-                error_persistence = aligned_gt - aligned_persistence
-                spatial_rmse = np.sqrt((error_persistence**2).mean(dim='time', skipna=True))
-                total_rmse = spatial_rmse.mean(dim=['latitude', 'longitude'], skipna=True).compute().item()
-                total_rmse_results['persistence'].append(total_rmse)
-            except Exception as e:
-                print(f"Error in persistence calculation for step {hr_lead}h: {e}")
-                total_rmse_results['persistence'].append(np.nan)
-        else:
-            total_rmse_results['persistence'].append(np.nan)
-
-        # --- Model Forecasts Calculation ---
-        for model_name, model_ds in processed_forecast_datasets.items():
-            if 'step' in model_ds.coords and step_for_sel in model_ds.step.data:
-                try:
-                    model_at_step = model_ds.sel(step=step_for_sel)
-                    forecast_valid_times = model_at_step['base_time'].data + step_for_sel
-                    gt_aligned = processed_gt_da.interp(
-                        time=forecast_valid_times,
-                        method='linear',
-                        kwargs={'fill_value': np.nan}
-                    )
-                    gt_aligned_for_subtraction = gt_aligned.rename({'time': 'base_time'})
-                    aligned_model, aligned_gt = xr.align(
-                        model_at_step, gt_aligned_for_subtraction, join='inner'
-                    )
-                    error = aligned_model - aligned_gt
-                    spatial_rmse = np.sqrt((error**2).mean(dim='base_time', skipna=True))
-                    total_rmse = spatial_rmse.mean(dim=['latitude', 'longitude'], skipna=True).compute().item()
-                    total_rmse_results[model_name].append(total_rmse)
-                except Exception as e:
-                    print(f"Error for {model_name} at step {hr_lead}h: {e}")
-                    total_rmse_results[model_name].append(np.nan)
+    # --- 3. Calculate Errors for each Model and Lead Time ---
+    print("Calculating errors...")
+    
+    # --- Persistence Model ---
+    try:
+        base_time_diff = np.median(np.diff(gt_ds['base_time'].values))
+        shift_steps = int(round(pd.to_timedelta('24h') / base_time_diff))
+        persistence_fc = gt_ds.shift(base_time=-shift_steps)
+        aligned_gt_p, aligned_pers = xr.align(gt_ds, persistence_fc, join='inner', copy=False)
+        for lead_h, lead_td in zip(lead_times_h, lead_times_td):
+            gt_at_lead = aligned_gt_p['2m_temperature'].sel(step=lead_td, method='nearest')
+            pers_at_lead = aligned_pers['2m_temperature'].sel(step=lead_td, method='nearest')
+            # Calculate the single MAE value over the spatial and time dimensions
+            error = float(xr.ufuncs.fabs(gt_at_lead - pers_at_lead).mean().compute())
+            errors_df.loc['Persistence (24h)', lead_h] = error
+        print("  - Calculated Persistence error.")
+    except Exception as e:
+        print(f"Warning: Could not compute persistence error. {e}")
+    print(errors_df)
+    exit()
+    # --- Forecast Models ---
+    for model_name, forecast_path in forecast_paths.items():
+        try:
+            if forecast_path.endswith('.zarr'):
+                fc_ds = xr.open_zarr(forecast_path).sortby(['latitude', 'longitude'])
+                fc_ds.coords['step'] = fc_ds.coords['step'] + pd.to_timedelta(6, unit='h')
             else:
-                total_rmse_results[model_name].append(np.nan)
+                fc_ds = xr.open_dataset(forecast_path).sortby(['latitude', 'longitude'])
+                if "t2m" in fc_ds.data_vars: fc_ds = fc_ds.rename({'t2m': '2m_temperature'})
+                if "time" in fc_ds.dims: fc_ds = fc_ds.rename({'time': 'base_time'})
+                coords_to_drop = [c for c in ['number', 'heightAboveGround', 'surface', 'valid_time'] if c in fc_ds.coords]
+                if coords_to_drop: fc_ds = fc_ds.drop_vars(coords_to_drop)
+                
+            if sub_region:
+                fc_ds = fc_ds.sel(sub_region)
 
-    plt.figure(figsize=(12, 7))
-    for model_name, rmse_values in total_rmse_results.items():
-        valid_indices = [i for i, val in enumerate(rmse_values) if pd.notna(val)]
-        if valid_indices:
-            plt.plot(
-                [lead_times_hours[i] for i in valid_indices],
-                [rmse_values[i] for i in valid_indices],
-                marker='o', linestyle='-', label=model_name
-            )
+            regridded_fc = fc_ds.interp_like(gt_ds, method="linear")
+            aligned_fc, aligned_gt = xr.align(regridded_fc, gt_ds, join='inner', copy=False)
 
-    plt.xlabel('Forecast Lead Time (hours)', fontsize=12)
-    plt.ylabel(f'Total RMSE of {variable_name.replace("_", " ").title()}', fontsize=12)
-    plt.title(f'Total RMSE vs. Lead Time for {variable_name.replace("_", " ").title()}', fontsize=14)
-    plt.xticks(sorted(list(set(lead_times_hours))))
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend(title='Models', bbox_to_anchor=(1.05, 1), loc='upper left')
+            for lead_h, lead_td in zip(lead_times_h, lead_times_td):
+                gt_at_lead = aligned_gt['2m_temperature'].sel(step=lead_td, method='nearest')
+                fc_at_lead = aligned_fc['2m_temperature'].sel(step=lead_td, method='nearest')
+                error = float(xr.ufuncs.fabs(gt_at_lead - fc_at_lead).mean().compute())
+                errors_df.loc[model_name, lead_h] = error
+            print(f"  - Calculated {model_name} error.")
+        except Exception as e:
+            print(f"Warning: Could not process model '{model_name}'. {e}")
+
+    # --- 4. Plotting the Time Series ---
+    print("\nGenerating time series plot...")
+    
+    # Transpose the DataFrame so lead times are on the x-axis
+    errors_to_plot = errors_df.T
+    
+    plt.style.use('seaborn-v0_8-whitegrid')
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Use seaborn for a slightly nicer look, with markers
+    sns.lineplot(data=errors_to_plot, ax=ax, marker='o', markersize=8)
+    
+    # Formatting the plot
+    region_str = "Global" if not sub_region else "Sub-Region"
+    title_suffix = f" ({suffix})" if suffix else ""
+    ax.set_title(f'Forecast Error (MAE) vs. Lead Time for 2m Temperature ({region_str}){title_suffix}', fontsize=16)
+    ax.set_xlabel('Lead Time (hours)', fontsize=12)
+    ax.set_ylabel('Mean Absolute Error (K)', fontsize=12)
+    ax.legend(title='Forecast Model')
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    
+    # Ensure x-axis ticks match the lead times
+    ax.set_xticks(lead_times_h)
+    
     plt.tight_layout()
-
-    filename = os.path.join(output_dir, f"total_rmse_line_plot_{variable_name}{suffix}.png")
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    print(f"Saved: {filename}")
-    plt.close()
-
+    
+    # Save the figure
+    filename_suffix = f"_{suffix}" if suffix else ""
+    output_filename = os.path.join(output_folder, f"error_timeseries{filename_suffix}.png")
+    plt.savefig(output_filename, dpi=150)
+    print(f"Successfully saved plot to: {output_filename}")
+    
+    # Display the final error data
+    print("\n--- Mean Absolute Error (K) ---")
+    print(errors_df.to_string(float_format="%.4f"))
 
 if __name__ == "__main__":
-    groundtruth = xr.open_zarr('/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch/groundtruth.zarr')
-    groundtruth.coords['step'] = groundtruth.coords['step'] + pd.to_timedelta(6, unit='h')
-    groundtruth_filtered = filter_dates(groundtruth)
+    output_directory = 'total_rmse_plots'
+    groundtruth_path = '/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch/groundtruth.zarr'
+    forecast_paths = {
+        "gc-finetuned": '/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch/predicted.zarr',
+        "gc-base": '/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch/predicted_base.zarr',
+        "ncep": '/Datastorage/divij.khaitan_asp25/forecasts_2022/ncep_forecasts.nc',
+        "imd": '/Datastorage/divij.khaitan_asp25/forecasts_2022/imd_forecasts.nc',
+        "hres": '/Datastorage/divij.khaitan_asp25/forecasts_2022/hres_forecasts.nc' # Add hres if needed
+    }
 
-    predictions = xr.open_zarr('/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch/predicted.zarr')
-    predictions.coords['step'] = predictions.coords['step'] + pd.to_timedelta(6, unit='h')
-    predictions_filtered = filter_dates(predictions)
+    india_sub_region = {'latitude': slice(7.5, 37.5), 'longitude': slice(67.5, 97.5)}
 
-    base = xr.open_zarr('/Datastorage/divij.khaitan_asp25/model_package_India-Finetune-100epoch/predicted_base.zarr')
-    base.coords['step'] = base.coords['step'] + pd.to_timedelta(6, unit='h')
-    base_filtered = filter_dates(base)
+    print(f"Cartopy installed: {CARTOPY_INSTALLED}")
+    if not CARTOPY_INSTALLED:
+        print("NOTE: Cartopy not found. Maps will be plotted without coastlines. For better plots, run 'pip install cartopy'")
 
-    imd = xr.load_dataset('/Datastorage/divij.khaitan_asp25/forecasts_2022/imd_forecasts.nc')
-    rename_dict = {'time': 'base_time', 't2m': '2m_temperature', 'tp': 'total_precipitation'}
 
-    imd = imd.rename(rename_dict)
-
-    ncep = xr.load_dataset('/Datastorage/divij.khaitan_asp25/forecasts_2022/ncep_forecasts.nc')
-    rename_dict = {'time': 'base_time', 't2m': '2m_temperature', 'tp': 'total_precipitation'}
-
-    ncep = ncep.rename(rename_dict)
-
-    coords_to_drop = ['number', 'heightAboveGround', 'surface', 'valid_time']
-    coords_to_drop = [coord for coord in coords_to_drop if coord in ncep.coords]
-    if coords_to_drop:
-        ncep = ncep.drop_vars(coords_to_drop)
-        imd = imd.drop_vars(coords_to_drop)
-    ncep_filtered = filter_dates(ncep)
-    imd_filtered = filter_dates(imd)
-
-    # plot_and_save_spatial_rmse_heatmaps(groundtruth, {"gc-finetuned": predictions, "gc-base": base, "ncep":ncep}, '2m_temperature', suffix='')
-
-    plot_total_rmse_by_lead_time(groundtruth_filtered, {"gc-finetuned": predictions_filtered, "gc-base": base_filtered, "ncep":ncep_filtered, "imd":imd_filtered}, '2m_temperature', suffix='all_world')
+    plot_error_timeseries(
+        groundtruth_path=groundtruth_path,
+        forecast_paths=forecast_paths,
+        output_folder=output_directory,
+        sub_region=india_sub_region,
+        suffix='India',
+    )

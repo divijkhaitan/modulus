@@ -180,3 +180,5 @@ examples/weather/unified_recipe/visualizations
 examples/weather/unified_recipe/tmax
 examples/weather/unified_recipe/tmin
 examples/weather/unified_recipe/checkpoints*/*
+examples/weather/unified_recipe/forecast_validation_pics*/*
+examples/weather/unified_recipe/rmse_heatmaps*/*

@@ -21,8 +21,8 @@ input_shape: [721, 1440]
 input_mean: ../../../../mean_by_level.nc
 input_std: ../../../../stddev_by_level.nc
 output_std: ../../../../diffs_stddev_by_level.nc
-pretrain_load_path: model_package_India-Finetune_0.25_13_20_epoch/model.mdlus
-# pretrain_load_path: ../../../../gc_weights/graphcast_0.25_13_concat_trick.mdlus
+# pretrain_load_path: model_package_India-Finetune_0.25_13_20_epoch/model.mdlus
+pretrain_load_path: ../../../../gc_weights/graphcast_0.25_13_concat_trick.mdlus
 nr_input_steps: 2
 force_single_checkpoint: False
 checkpoint_encoder: True

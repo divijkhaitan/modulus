@@ -52,7 +52,7 @@ def main(cfg: DictConfig) -> None:
 
     # Get file system mapper
     save_mapper = save_fs.get_mapper(cfg.dataset.dataset_filename)
-    print(save_mapper)
+    print(f"Save mapper: {save_mapper}")
     # Get ARCO ERA5 dataset
     arco_filename = (
         "gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3"
@@ -65,6 +65,7 @@ def main(cfg: DictConfig) -> None:
         storage_options={'anon': True, 'token': 'anon'}, 
         consolidated=True
     )
+    print(f"Loaded ARCO ERA5 dataset with {len(arco_era5.time)} time steps")
     # Drop variables that are not needed
     for variable in arco_era5.variables:
         if (
@@ -79,6 +80,8 @@ def main(cfg: DictConfig) -> None:
     for variable in cfg.dataset.pressure_level_variables:
         encoding[variable] = {"chunks": (1, 1, 721, 1440)}
 
+    print(f"Start and end years: {cfg.dataset.years[0]} - {cfg.dataset.years[1]}")
+
     # Subsample time
     arco_era5 = arco_era5.sel(
         time=slice(
@@ -86,6 +89,10 @@ def main(cfg: DictConfig) -> None:
             datetime.datetime.strptime(cfg.dataset.years[1], "%Y-%m-%d"),
         ), 
         level = [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
+        # level = [   1,    2,    3,    5,    7,   10,   20,   30,   50,   70,  100,
+        # 125,  150,  175,  200,  225,  250,  300,  350,  400,  450,  500,
+        # 550,  600,  650,  700,  750,  775,  800,  825,  850,  875,  900,
+        # 925,  950,  975, 1000]
     )
     arco_era5 = arco_era5.sel(
         time=arco_era5.time.dt.hour.isin(np.arange(0, 24, cfg.dataset.dt))
@@ -120,6 +127,8 @@ def main(cfg: DictConfig) -> None:
 
     date_time_2d = np.array([date_time])
     arco_era5 = arco_era5.assign_coords({'datetime': (('batch', 'time'), date_time_2d)})
+
+    print("Adding derived variables")
     
     data_utils.add_derived_vars(arco_era5)
     arco_era5 = arco_era5.drop_vars(["datetime", 'year_progress', 'day_progress'])

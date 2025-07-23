@@ -38,7 +38,7 @@ stages:
 
   - name: "Constant LR TRAIN"
     max_iterations: .inf
-    num_epochs: 100
+    num_epochs: 10
     unroll_steps: 1
     batch_size: 1
     lr_scheduler_name: None
